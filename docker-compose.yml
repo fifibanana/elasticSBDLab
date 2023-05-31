@@ -1,0 +1,162 @@
+version: '3'
+services:
+  elasticsearch4:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elasticsearch4
+    environment:
+      - node.name=node4
+      - cluster.initial_master_nodes=node1,node2,node3
+      - discovery.seed_hosts=elasticsearch1,elasticsearch2,elasticsearch3,elasticsearch4,elasticsearch5
+      - cluster.name=my-cluster
+      - node.roles=[data,ingest]
+      - network.publish_host=elasticsearch4
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data1:/usr/share/elasticsearch/data
+    ports:
+      - 9204:9200
+      - 9304:9300
+    networks:
+      - elastic-network
+
+  elasticsearch5:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elasticsearch5
+    environment:
+      - node.name=node5
+      - cluster.initial_master_nodes=node1,node2,node3
+      - discovery.seed_hosts=elasticsearch1,elasticsearch2,elasticsearch3,elasticsearch4,elasticsearch5
+      - cluster.name=my-cluster
+      - node.roles=data
+      - network.publish_host=elasticsearch5
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data2:/usr/share/elasticsearch/data
+    ports:
+      - 9205:9200
+      - 9305:9300
+    networks:
+      - elastic-network
+
+
+  elasticsearch1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elasticsearch1
+    environment:
+      - node.name=node1
+      - cluster.initial_master_nodes=node1,node2,node3
+      - discovery.seed_hosts=elasticsearch1,elasticsearch2,elasticsearch3,elasticsearch4,elasticsearch5
+      - cluster.name=my-cluster
+      - node.roles=master,data
+      - network.publish_host=elasticsearch1
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data3:/usr/share/elasticsearch/data
+    ports:
+      - 9201:9200
+      - 9301:9300
+    networks:
+      - elastic-network
+
+  elasticsearch2:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elasticsearch2
+    environment:
+      - node.name=node2
+      - cluster.initial_master_nodes=node1,node2,node3
+      - discovery.seed_hosts=elasticsearch1,elasticsearch2,elasticsearch3,elasticsearch4,elasticsearch5
+      - cluster.name=my-cluster
+      - node.roles=master,data
+      - network.publish_host=elasticsearch2
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data4:/usr/share/elasticsearch/data
+    ports:
+      - 9202:9200
+      - 9302:9300
+    networks:
+      - elastic-network
+      
+  elasticsearch3:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elasticsearch3
+    environment:
+      - node.name=node3
+      - cluster.initial_master_nodes=node1,node2,node3
+      - discovery.seed_hosts=elasticsearch1,elasticsearch2,elasticsearch3,elasticsearch4,elasticsearch5
+      - cluster.name=my-cluster
+      - node.roles=master,data
+      - network.publish_host=elasticsearch3
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data5:/usr/share/elasticsearch/data
+    ports:
+      - 9203:9200
+      - 9303:9300
+    networks:
+      - elastic-network
+
+  kibana:
+    container_name: kb-container
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    environment:
+      - ELASTICSEARCH_HOSTS=["http://elasticsearch1:9200","http://elasticsearch2:9200","http://elasticsearch3:9200"]
+    networks:
+      - elastic-network
+    depends_on:
+      - elasticsearch1
+      - elasticsearch2
+      - elasticsearch3
+      - elasticsearch4
+      - elasticsearch5
+    links:
+      - elasticsearch1
+      - elasticsearch2
+      - elasticsearch3
+      - elasticsearch4
+      - elasticsearch5
+    ports:
+      - 5601:5601
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: logstash
+    deploy:
+     mode: replicated
+     replicas: 1
+     placement:
+       constraints:
+          - node.role == manager
+    environment:
+      - xpack.monitoring.enabled=true
+      - xpack.monitoring.elasticsearch.hosts=["elasticsearch1:9200", "elasticsearch2:9200", "elasticsearch3:9200", "elasticsearch4:9200", "elasticsearch5:9200"]
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf 
+      - ./input.log:/usr/share/logstash/load/input.log      
+    ports:
+      - 5044:5044
+    networks:
+      - elastic-network
+    depends_on:
+      - elasticsearch1
+      - elasticsearch2
+      - elasticsearch3
+      - elasticsearch4
+      - elasticsearch5
+      - kibana
+
+volumes:
+  elasticsearch-data1:
+  elasticsearch-data2:
+  elasticsearch-data3:
+  elasticsearch-data4:
+  elasticsearch-data5:
+
+
+networks:
+  elastic-network:
+    driver: bridge
